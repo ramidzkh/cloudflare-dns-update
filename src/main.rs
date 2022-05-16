@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{Read, Write};
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
 use clap::Parser;
@@ -8,10 +8,12 @@ use cloudflare::endpoints::dns::{
     DnsContent, ListDnsRecords, ListDnsRecordsParams, UpdateDnsRecord, UpdateDnsRecordParams,
 };
 use cloudflare::endpoints::zone::{ListZones, ListZonesParams};
+use either::{Left, Right};
 
 use crate::cli::Cli;
 
 mod cli;
+mod ip;
 
 #[tokio::main]
 async fn main() {
@@ -20,12 +22,10 @@ async fn main() {
             .unwrap(),
     );
     let client = cli.client.create_client();
+    let ipv6 = cli.ipv6.unwrap_or(false);
 
     let (ip, content) = {
-        let response = reqwest::get("https://checkip.amazonaws.com/")
-            .await
-            .unwrap();
-        let ip = response.text().await.unwrap();
+        let ip = ip::find_ip(ipv6).await.unwrap();
 
         // Compare with temporary file
         if let Some(old_value) = cli
@@ -42,8 +42,13 @@ async fn main() {
             }
         }
 
-        let address = Ipv4Addr::from_str(ip.trim()).unwrap();
-        (ip, address)
+        if ipv6 {
+            let address = Ipv6Addr::from_str(ip.trim()).unwrap();
+            (ip, Left(address))
+        } else {
+            let address = Ipv4Addr::from_str(ip.trim()).unwrap();
+            (ip, Right(address))
+        }
     };
 
     let zone = client
@@ -84,7 +89,10 @@ async fn main() {
                 ttl: Some(record.ttl),
                 proxied: Some(record.proxied),
                 name: &cli.record,
-                content: DnsContent::A { content },
+                content: match content {
+                    Left(content) => DnsContent::AAAA { content },
+                    Right(content) => DnsContent::A { content },
+                },
             },
         })
         .await

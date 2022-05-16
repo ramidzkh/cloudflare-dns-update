@@ -18,6 +18,9 @@ pub struct Cli {
 
     /// Cache for the IP, so that CloudFlare servers are not unnecessarily pinged
     pub cache: Option<String>,
+
+    /// Use IPv6 with AAAA records
+    pub ipv6: Option<bool>,
 }
 
 #[derive(Args, Debug)]

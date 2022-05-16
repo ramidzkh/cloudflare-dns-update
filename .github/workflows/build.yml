@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: "! contains(toJSON(github.event.commits.*.message), '[ci skip]')"
     steps:
       - name: Checkout repository

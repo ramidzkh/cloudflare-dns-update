@@ -1,6 +1,3 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
-use std::str::FromStr;
-
 use tokio::select;
 
 pub async fn find_ip(ipv6: bool) -> Option<String> {
@@ -29,22 +26,34 @@ async fn find_ipv6() -> Option<String> {
 
 async fn amazon() -> reqwest::Result<String> {
     reqwest::get("https://checkip.amazonaws.com/")
-        .await?.text().await.map(trim)
+        .await?
+        .text()
+        .await
+        .map(trim)
 }
 
 async fn ident_ipv4() -> reqwest::Result<String> {
     reqwest::get("https://v4.ident.me/")
-        .await?.text().await.map(trim)
+        .await?
+        .text()
+        .await
+        .map(trim)
 }
 
 async fn ifconfig() -> reqwest::Result<String> {
     reqwest::get("https://ifconfig.me/")
-        .await?.text().await.map(trim)
+        .await?
+        .text()
+        .await
+        .map(trim)
 }
 
 async fn ident_ipv6() -> reqwest::Result<String> {
     reqwest::get("https://v6.ident.me/")
-        .await?.text().await.map(trim)
+        .await?
+        .text()
+        .await
+        .map(trim)
 }
 
 fn trim(string: String) -> String {
@@ -53,6 +62,9 @@ fn trim(string: String) -> String {
 
 #[tokio::test]
 async fn test() {
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::str::FromStr;
+
     if let Ok(ip) = &amazon().await {
         assert!(Ipv4Addr::from_str(ip).is_ok());
     }

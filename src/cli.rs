@@ -11,15 +11,17 @@ pub struct Cli {
     #[clap(flatten)]
     pub client: Client,
 
-    /// Zone to search the record in, such as example.org
+    /// Zone ID to search the record in, such as de238d165c115286820c8e0852cd325c
     pub zone: String,
+
     /// Record to search for, such as www.example.org
     pub record: String,
 
     /// Cache for the IP, so that CloudFlare servers are not unnecessarily pinged
+    #[clap(long)]
     pub cache: Option<String>,
 
-    /// Use IPv6 with AAAA records
+    /// Use IPv6 with AAAA records. IPv4 by default
     pub ipv6: Option<bool>,
 }
 
@@ -29,7 +31,7 @@ pub struct Client {
     ///  * For email and API key, use <email>=<api key> {n}
     ///  * For service token, use service=<token> {n}
     ///  * For user token, use <token> {n}
-    #[clap(short, long)]
+    #[clap(long)]
     credentials: Option<Credentials>,
 }
 
@@ -46,14 +48,14 @@ impl Client {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Credentials(pub CfCredentials);
 
 impl FromStr for Credentials {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.split_once("=") {
+        match s.split_once('=') {
             Some(("service", key)) => Ok(Self(CfCredentials::Service {
                 key: key.to_string(),
             })),

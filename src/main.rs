@@ -7,8 +7,6 @@ use clap::Parser;
 use cloudflare::endpoints::dns::{
     DnsContent, ListDnsRecords, ListDnsRecordsParams, UpdateDnsRecord, UpdateDnsRecordParams,
 };
-use cloudflare::endpoints::zone::{ListZones, ListZonesParams};
-use either::{Left, Right};
 
 use crate::cli::Cli;
 
@@ -17,10 +15,8 @@ mod ip;
 
 #[tokio::main]
 async fn main() {
-    let cli = Cli::parse_from(
-        argfile::expand_args_from(wild::args_os(), argfile::parse_fromfile, argfile::PREFIX)
-            .unwrap(),
-    );
+    let cli =
+        Cli::parse_from(argfile::expand_args(argfile::parse_fromfile, argfile::PREFIX).unwrap());
     let client = cli.client.create_client();
     let ipv6 = cli.ipv6.unwrap_or(false);
 
@@ -43,56 +39,37 @@ async fn main() {
         }
 
         if ipv6 {
-            let address = Ipv6Addr::from_str(ip.trim()).unwrap();
-            (ip, Left(address))
+            let content = Ipv6Addr::from_str(ip.trim()).unwrap();
+            (ip, DnsContent::AAAA { content })
         } else {
-            let address = Ipv4Addr::from_str(ip.trim()).unwrap();
-            (ip, Right(address))
+            let content = Ipv4Addr::from_str(ip.trim()).unwrap();
+            (ip, DnsContent::A { content })
         }
     };
 
-    let zone = client
-        .request_handle(&ListZones {
-            params: ListZonesParams {
-                name: Some(cli.zone),
-                ..Default::default()
-            },
-        })
-        .await
-        .unwrap()
-        .result
-        .into_iter()
-        .next()
-        .expect("Zone could not be found")
-        .id;
-
-    let record = client
-        .request_handle(&ListDnsRecords {
-            zone_identifier: &zone,
-            params: ListDnsRecordsParams {
-                name: Some(cli.record.clone()),
-                ..Default::default()
-            },
-        })
-        .await
-        .unwrap()
-        .result
-        .into_iter()
-        .next()
-        .expect("Record could not be found");
+    let record = get_only_element(
+        client
+            .request_handle(&ListDnsRecords {
+                zone_identifier: &cli.zone,
+                params: ListDnsRecordsParams {
+                    name: Some(cli.record.clone()),
+                    ..Default::default()
+                },
+            })
+            .await
+            .unwrap()
+            .result,
+    );
 
     client
         .request_handle(&UpdateDnsRecord {
-            zone_identifier: &zone,
+            zone_identifier: &cli.zone,
             identifier: &record.id,
             params: UpdateDnsRecordParams {
                 ttl: Some(record.ttl),
                 proxied: Some(record.proxied),
                 name: &cli.record,
-                content: match content {
-                    Left(content) => DnsContent::AAAA { content },
-                    Right(content) => DnsContent::A { content },
-                },
+                content,
             },
         })
         .await
@@ -104,5 +81,16 @@ async fn main() {
         {
             write!(file, "{}", ip);
         }
+    }
+}
+
+fn get_only_element<T>(vec: Vec<T>) -> T
+where
+    T: std::fmt::Debug,
+{
+    if vec.len() == 1 {
+        vec.into_iter().next().unwrap()
+    } else {
+        panic!("Expected single entry, found multiple: {:?}", vec);
     }
 }

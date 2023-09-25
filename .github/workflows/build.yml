@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     if: "! contains(toJSON(github.event.commits.*.message), '[ci skip]')"
     steps:
       - name: Checkout repository
@@ -27,8 +27,22 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+          args: --workspace
+      - name: Test
+        uses: actions-rs/cargo@v1
+        continue-on-error: true
         with:
-          name: cloudflare-dns-update
-          path: target/debug/cloudflare-dns-update
+          command: test
+          args: --workspace
+      - name: Format
+        uses: actions-rs/cargo@v1
+        continue-on-error: true
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        continue-on-error: true
+        with:
+          command: clippy
+          args: --workspace -- -D warnings
